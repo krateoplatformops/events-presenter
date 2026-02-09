@@ -1,7 +1,7 @@
 namespace: demo-system
 name: events-presenter
 
-replicas: 3
+replicas: 1
 
 image:
   repository: ghcr.io/krateoplatformops/events-presenter
@@ -13,7 +13,7 @@ imagePullSecrets: []
 serviceAccount:
   create: true
   name: ""
-  automount: false
+  automount: true
 
 service:
   port: 8084
