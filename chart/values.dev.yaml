@@ -6,6 +6,7 @@ config:
   DB_HOST: postgres.demo-system.svc.cluster.local
   DB_NAME: testdb
   DB_PARAMS: "sslmode=disable"
+  NAMESPACES: "demo-system"
 
 service:
   port: 8084

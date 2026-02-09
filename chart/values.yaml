@@ -21,8 +21,6 @@ service:
 config:
   DEBUG: "false"
   DB_READY_TIMEOUT: "2m"
-  PORT: "8084"
-  NAMESPACES: "demo-system"
 
 secret:
   create: false
