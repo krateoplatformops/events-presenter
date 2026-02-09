@@ -7,6 +7,9 @@ config:
   DB_NAME: testdb
   DB_PARAMS: "sslmode=disable"
 
+service:
+  port: 8084
+
 secret:
   create: false
   name: eventrouter-db
