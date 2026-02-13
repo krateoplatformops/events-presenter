@@ -2,11 +2,14 @@ replicas: 1
 
 config:
   DEBUG: "true"
+
+  DB_HOST: postgres.eventstack-system.svc.cluster.local
   DB_PORT: "5432"
-  DB_HOST: postgres.demo-system.svc.cluster.local
+  DB_USER: test
+  DB_PASS: test
   DB_NAME: testdb
   DB_PARAMS: "sslmode=disable"
-  NAMESPACES: "demo-system"
+  DB_READY_TIMEOUT: "4m"
 
 service:
   port: 8084
