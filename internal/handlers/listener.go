@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/krateoplatformops/events-presenter/internal/queue"
+	"github.com/krateoplatformops/events-presenter/internal/util/pg/retry"
 )
 
 type PgListenerConfig struct {
@@ -76,7 +77,9 @@ func listenAndServe(
 		q.Push(queue.NewJob(globalUID, func(v interface{}) {
 			uid := v.(string)
 
-			events, err := loadLatestEvents(ctx, db, uid)
+			events, err := retry.Do(ctx, retry.Default(), func() ([]ResourceEvent, error) {
+				return loadLatestEvents(ctx, db, uid)
+			})
 			if err != nil {
 				log.Println("query error:", err)
 				return
