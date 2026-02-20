@@ -81,10 +81,9 @@ resources:
 probes:
   readiness:
     path: /readyz
-    initialDelaySeconds: 5
-    periodSeconds: 10
+    initialDelaySeconds: 45
+    periodSeconds: 90
   liveness:
     path: /livez
-    initialDelaySeconds: 10
-    periodSeconds: 15
-
+    initialDelaySeconds: 45
+    periodSeconds: 90

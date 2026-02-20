@@ -8,7 +8,7 @@ config:
   DB_USER: test
   DB_PASS: test
   DB_NAME: testdb
-  DB_PARAMS: "sslmode=disable"
+  DB_PARAMS: "sslmode=disable&connect_timeout=5&keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=3"
   DB_READY_TIMEOUT: "4m"
 
 service:
