@@ -2,7 +2,8 @@ package handlers
 
 import (
 	"context"
-	"log"
+	"errors"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -16,6 +17,7 @@ type PgListenerConfig struct {
 	DSN           string
 	Channel       string
 	ReconnectWait time.Duration
+	Log           *slog.Logger
 }
 
 func RunPgListener(
@@ -25,29 +27,36 @@ func RunPgListener(
 	db *pgxpool.Pool,
 	hub *EventHub,
 ) {
-	backoff := cfg.ReconnectWait
-	if backoff == 0 {
-		backoff = time.Second
+	baseBackoff := cfg.ReconnectWait
+	if baseBackoff <= 0 {
+		baseBackoff = time.Second
 	}
+	backoff := baseBackoff
 
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 
-		log.Println("pg listener: connecting...")
+		cfg.Log.Debug("pg listener: connecting...")
+
 		conn, err := pgx.Connect(ctx, cfg.DSN)
 		if err != nil {
-			log.Printf("pg listener: connect failed: %v", err)
-			sleep(ctx, backoff)
+			backoff = sleepWithBackoff(ctx, backoff)
+			cfg.Log.Warn("pg listener: connect failed",
+				slog.String("backoff", backoff.String()),
+				slog.Any("err", err))
 			continue
 		}
+		backoff = baseBackoff
 
-		err = listenAndServe(ctx, conn, cfg.Channel, q, db, hub)
-		log.Printf("pg listener: disconnected: %v", err)
+		err = listenAndServe(ctx, conn, cfg.Channel, q, db, hub, cfg.Log)
+		if err != nil && !errors.Is(err, context.Canceled) {
+			cfg.Log.Error("pg listener: disconnected", slog.Any("err", err))
+		}
 
 		conn.Close(ctx)
-		sleep(ctx, backoff)
+		backoff = sleepWithBackoff(ctx, backoff)
 	}
 }
 
@@ -58,17 +67,29 @@ func listenAndServe(
 	q queue.Queuer,
 	db *pgxpool.Pool,
 	hub *EventHub,
+	log *slog.Logger,
 ) error {
 	_, err := conn.Exec(ctx, "LISTEN "+pgx.Identifier{channel}.Sanitize())
 	if err != nil {
 		return err
 	}
 
-	log.Printf("pg listener: LISTEN %s", channel)
+	log.Info("pg listener: LISTEN", slog.String("channel", channel))
 
 	for {
-		n, err := conn.WaitForNotification(ctx)
+		waitCtx, waitCancel := context.WithTimeout(ctx, 30*time.Second)
+		n, err := conn.WaitForNotification(waitCtx)
+		waitCancel()
 		if err != nil {
+			if errors.Is(err, context.DeadlineExceeded) {
+				pingCtx, pingCancel := context.WithTimeout(ctx, 5*time.Second)
+				pingErr := conn.Ping(pingCtx)
+				pingCancel()
+				if pingErr != nil {
+					return pingErr
+				}
+				continue
+			}
 			return err
 		}
 
@@ -77,11 +98,22 @@ func listenAndServe(
 		q.Push(queue.NewJob(globalUID, func(v interface{}) {
 			uid := v.(string)
 
-			events, err := retry.Do(ctx, retry.Default(), func() ([]ResourceEvent, error) {
-				return loadLatestEvents(ctx, db, uid)
+			queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
+			defer cancel()
+
+			// A longer retry window avoids dropping notifications during
+			// short DB outages (pod restart, failover, rolling updates).
+			events, err := retry.Do(queryCtx, retry.Config{
+				MaxAttempts: 12,
+				BaseDelay:   500 * time.Millisecond,
+				MaxDelay:    10 * time.Second,
+			}, func() ([]ResourceEvent, error) {
+				return loadLatestEvents(queryCtx, db, uid)
 			})
 			if err != nil {
-				log.Println("query error:", err)
+				log.Error("query error",
+					slog.String("global_uid", uid),
+					slog.Any("err", err))
 				return
 			}
 
@@ -92,7 +124,7 @@ func listenAndServe(
 	}
 }
 
-func sleep(ctx context.Context, d time.Duration) {
+func sleepWithBackoff(ctx context.Context, d time.Duration) time.Duration {
 	t := time.NewTimer(d)
 	defer t.Stop()
 
@@ -100,6 +132,12 @@ func sleep(ctx context.Context, d time.Duration) {
 	case <-t.C:
 	case <-ctx.Done():
 	}
+
+	next := d * 2
+	if next > 30*time.Second {
+		next = 30 * time.Second
+	}
+	return next
 }
 
 func loadLatestEvents(

@@ -13,7 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/krateoplatformops/events-presenter/internal/config"
 	"github.com/krateoplatformops/events-presenter/internal/handlers"
 	"github.com/krateoplatformops/events-presenter/internal/probes"
@@ -38,12 +37,6 @@ func main() {
 	defer pool.Close()
 	cfg.Log.Info("PostgreSQL is ready.")
 
-	listenConn, err := pgx.Connect(rootCtx, cfg.DbURL)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer listenConn.Close(rootCtx)
-
 	health := probes.New(pool)
 
 	// Queue
@@ -58,7 +51,8 @@ func main() {
 	lo := handlers.PgListenerConfig{
 		DSN:           cfg.DbURL,
 		Channel:       "events",
-		ReconnectWait: 4 * time.Second,
+		ReconnectWait: 5 * time.Second,
+		Log:           cfg.Log,
 	}
 
 	listenerCtx, cancelListener := context.WithCancel(rootCtx)
