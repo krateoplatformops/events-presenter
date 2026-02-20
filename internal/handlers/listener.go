@@ -42,8 +42,10 @@ func RunPgListener(
 
 		conn, err := pgx.Connect(ctx, cfg.DSN)
 		if err != nil {
-			cfg.Log.Warn("pg listener: connect failed", slog.Any("err", err))
 			backoff = sleepWithBackoff(ctx, backoff)
+			cfg.Log.Warn("pg listener: connect failed",
+				slog.String("backoff", backoff.String()),
+				slog.Any("err", err))
 			continue
 		}
 		backoff = baseBackoff
