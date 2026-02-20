@@ -1,6 +1,3 @@
-# ---------------------------------------------------------
-# ROLE: allow reading Kubernetes Events and Involved Objects
-# ---------------------------------------------------------
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
