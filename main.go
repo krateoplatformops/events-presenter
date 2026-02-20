@@ -51,7 +51,8 @@ func main() {
 	lo := handlers.PgListenerConfig{
 		DSN:           cfg.DbURL,
 		Channel:       "events",
-		ReconnectWait: 4 * time.Second,
+		ReconnectWait: 5 * time.Second,
+		Log:           cfg.Log,
 	}
 
 	listenerCtx, cancelListener := context.WithCancel(rootCtx)
