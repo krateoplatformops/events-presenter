@@ -1,4 +1,21 @@
-replicas: 1
+replicaCount: 1
+
+service:
+  port: 8083
+
+ingress:
+  enabled: false
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+secret:
+  name: eventrouter-db
 
 config:
   DEBUG: "true"
@@ -8,23 +25,5 @@ config:
   DB_USER: test
   DB_PASS: test
   DB_NAME: testdb
-  DB_PARAMS: "sslmode=disable"
+  DB_PARAMS: "sslmode=disable&connect_timeout=5&keepalives=1&keepalives_idle=30&keepalives_interval=10&keepalives_count=3"
   DB_READY_TIMEOUT: "4m"
-
-service:
-  port: 8084
-
-secret:
-  create: false
-  name: eventrouter-db
-
-ingress:
-  enabled: false
-
-resources:
-  requests:
-    cpu: 10m
-    memory: 32Mi
-  limits:
-    cpu: 100m
-    memory: 128Mi

@@ -1,0 +1,17 @@
+# ---------------------------------------------------------
+# ROLE BINDING
+# ---------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "events-presenter.fullname" . }}-events
+  labels:
+    {{- include "events-presenter.labels" . | nindent 4 }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "events-presenter.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ include "events-presenter.fullname" . }}-events
+  apiGroup: rbac.authorization.k8s.io
