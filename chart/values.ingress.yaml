@@ -1,0 +1,31 @@
+config:
+  DEBUG: "true"          
+  DB_HOST: pg-cluster-rw.krateo-system.svc.cluster.local
+  DB_NAME: events-db
+  DB_PARAMS: "sslmode=disable"
+  DB_READY_TIMEOUT: "5m"
+
+image:
+  tag: "0.1.7"
+        
+ingress:
+  enabled: true
+
+  className: "" # use default ingress class if empty. For example, in GKE, the default ingress class is "gce".
+  annotations: {}
+    # cert-manager.io/cluster-issuer: letsencrypt-krateo
+    # external-dns.alpha.kubernetes.io/hostname: events.krateoplatformops.io
+  hosts:
+    - host: events.krateoplatformops.io
+      paths:
+        - path: /
+          pathType: Prefix
+
+  tls: []
+  # - secretName: events-krateo-certificate
+  #   hosts:
+  #     - events.krateoplatformops.io
+
+# curl examples:
+# curl -H "Host: events.krateoplatformops.io" http://<LOAD_BALANCER_IP>/events
+# curl -H "Host: events.krateoplatformops.io" http://<LOAD_BALANCER_IP>/notifications

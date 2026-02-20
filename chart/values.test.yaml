@@ -7,4 +7,3 @@ config:
 
 image:
   tag: "0.1.7"
-        
