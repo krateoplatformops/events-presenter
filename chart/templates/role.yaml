@@ -5,6 +5,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: {{ include "events-presenter.fullname" . }}-events
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "events-presenter.labels" . | nindent 4 }}
 rules:

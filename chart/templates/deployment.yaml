@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ include "events-presenter.fullname" . }}
+  namespace: {{ .Release.Namespace }}
   labels:
     {{- include "events-presenter.labels" . | nindent 4 }}
 spec:
