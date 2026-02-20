@@ -3,7 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -17,6 +17,7 @@ type PgListenerConfig struct {
 	DSN           string
 	Channel       string
 	ReconnectWait time.Duration
+	Log           *slog.Logger
 }
 
 func RunPgListener(
@@ -37,18 +38,19 @@ func RunPgListener(
 			return
 		}
 
-		log.Println("pg listener: connecting...")
+		cfg.Log.Debug("pg listener: connecting...")
+
 		conn, err := pgx.Connect(ctx, cfg.DSN)
 		if err != nil {
-			log.Printf("pg listener: connect failed: %v", err)
+			cfg.Log.Warn("pg listener: connect failed", slog.Any("err", err))
 			backoff = sleepWithBackoff(ctx, backoff)
 			continue
 		}
 		backoff = baseBackoff
 
-		err = listenAndServe(ctx, conn, cfg.Channel, q, db, hub)
+		err = listenAndServe(ctx, conn, cfg.Channel, q, db, hub, cfg.Log)
 		if err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("pg listener: disconnected: %v", err)
+			cfg.Log.Error("pg listener: disconnected", slog.Any("err", err))
 		}
 
 		conn.Close(ctx)
@@ -63,13 +65,14 @@ func listenAndServe(
 	q queue.Queuer,
 	db *pgxpool.Pool,
 	hub *EventHub,
+	log *slog.Logger,
 ) error {
 	_, err := conn.Exec(ctx, "LISTEN "+pgx.Identifier{channel}.Sanitize())
 	if err != nil {
 		return err
 	}
 
-	log.Printf("pg listener: LISTEN %s", channel)
+	log.Info("pg listener: LISTEN", slog.String("channel", channel))
 
 	for {
 		waitCtx, waitCancel := context.WithTimeout(ctx, 30*time.Second)
@@ -106,7 +109,9 @@ func listenAndServe(
 				return loadLatestEvents(queryCtx, db, uid)
 			})
 			if err != nil {
-				log.Printf("query error for global_uid=%s: %v", uid, err)
+				log.Error("query error",
+					slog.String("global_uid", uid),
+					slog.Any("err", err))
 				return
 			}
 
