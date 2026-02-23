@@ -124,9 +124,14 @@ affinity: {}
 #     --from-literal=DB_USER=myuser \
 #     --from-literal=DB_PASS=mypass \
 #     -n namespace_name
+# You can also set secret.create to true to have the chart create the secret from values below
+# (only recommended for development/testing, not for production use)
 
 secret:
   name: eventrouter-db # Name of the Kubernetes Secret containing DB_USER and DB_PASS keys for database credentials
+  create: false # Set to true to create the secret from values below (not recommended for production)
+  #DB_USER: "" # Database username (used if secret.create is true, not recommended for production)
+  #DB_PASS: "" # Database password (used if secret.create is true, not recommended for production)
 
 # Application configuration environment variables
 config:
