@@ -138,7 +138,7 @@ config:
   DEBUG: "false"
 
   # Maximum time to wait for PostgreSQL to become ready
-  DB_READY_TIMEOUT: "4m"
+  DB_READY_TIMEOUT: "5m"
 
   # Extra query parameters (e.g. sslmode=disable&connect_timeout=5)
   DB_PARAMS: "sslmode=disable&connect_timeout=5"
