@@ -120,18 +120,13 @@ affinity: {}
 # The secret must contain: DB_USER and DB_PASS keys
 # The secret must be created in the same namespace where the chart is deployed.
 # Example:
-#   kubectl create secret generic eventrouter-db \
+#   kubectl create secret generic events-stack-db \
 #     --from-literal=DB_USER=myuser \
 #     --from-literal=DB_PASS=mypass \
 #     -n namespace_name
-# You can also set secret.create to true to have the chart create the secret from values below
-# (only recommended for development/testing, not for production use)
 
 secret:
-  name: eventrouter-db # Name of the Kubernetes Secret containing DB_USER and DB_PASS keys for database credentials
-  create: false # Set to true to create the secret from values below (not recommended for production)
-  #DB_USER: "" # Database username (used if secret.create is true, not recommended for production)
-  #DB_PASS: "" # Database password (used if secret.create is true, not recommended for production)
+  name: events-stack-db # Name of the Kubernetes Secret containing DB_USER and DB_PASS keys for database credentials
 
 # Application configuration environment variables
 config:
@@ -144,6 +139,9 @@ config:
 
   # Maximum time to wait for PostgreSQL to become ready
   DB_READY_TIMEOUT: "4m"
+
+  # Extra query parameters (e.g. sslmode=disable&connect_timeout=5)
+  DB_PARAMS: "sslmode=disable&connect_timeout=5"
 
   # Database username (loaded from secret)
   # This value can be used for development/testing
@@ -161,6 +159,3 @@ config:
 
   # Database name
   # DB_NAME: ""
-
-  # Extra query parameters (e.g. sslmode=disable&connect_timeout=5)
-  # DB_PARAMS: ""
