@@ -1,33 +1,154 @@
-name: events-presenter
+# Default values for events-presenter.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
 
-replicas: 1
+replicaCount: 1
 
 image:
   repository: ghcr.io/krateoplatformops/events-presenter
-  tag: ""
   pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
 
 imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
 
 serviceAccount:
+  # Specifies whether a service account should be created
   create: true
-  name: ""
+  # Automatically mount a ServiceAccount's API credentials?
   automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
 
 service:
-  port: 8084
+  type: ClusterIP
+  port: 8083
 
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+livenessProbe:
+  httpGet:
+    path: /livez
+    port: http
+  initialDelaySeconds: 45
+  periodSeconds: 90
+
+readinessProbe:
+  httpGet:
+    path: /readyz
+    port: http
+  initialDelaySeconds: 45
+  periodSeconds: 90
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 100
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+# Additional volumes on the output Deployment definition.
+volumes: []
+# - name: foo
+#   secret:
+#     secretName: mysecret
+#     optional: false
+
+# Additional volumeMounts on the output Deployment definition.
+volumeMounts: []
+# - name: foo
+#   mountPath: "/etc/foo"
+#   readOnly: true
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+# ============================================================================
+# Application-Specific Configuration
+# ============================================================================
+
+# Secret reference for DB credentials
+# IMPORTANT: You must create this secret before deploying the chart.
+# The secret must contain: DB_USER and DB_PASS keys
+# The secret must be created in the same namespace where the chart is deployed.
+# Example:
+#   kubectl create secret generic events-stack-db \
+#     --from-literal=DB_USER=myuser \
+#     --from-literal=DB_PASS=mypass \
+#     -n namespace_name
+
+secret:
+  name: events-stack-db # Name of the Kubernetes Secret containing DB_USER and DB_PASS keys for database credentials
+
+# Application configuration environment variables
 config:
+  # HTTP server port (default: 8083)
+  # NOTE: containerPort will match this value automatically
+  # PORT: "8083"
+
   # Enable or disable debug logging
   DEBUG: "false"
 
   # Maximum time to wait for PostgreSQL to become ready
-  DB_READY_TIMEOUT: "4m"
+  DB_READY_TIMEOUT: "5m"
 
-  # Database username
+  # Extra query parameters (e.g. sslmode=disable&connect_timeout=5)
+  DB_PARAMS: "sslmode=disable&connect_timeout=5"
+
+  # Database username (loaded from secret)
+  # This value can be used for development/testing
   # DB_USER: ""
 
-  # Database password (prefer using a Secret)
+  # Database password (loaded from secret)
+  # This value can be used for development/testing
   # DB_PASS: ""
 
   # Database host
@@ -36,54 +157,5 @@ config:
   # PostgreSQL port
   # DB_PORT: "5432"
 
-  # Extra query parameters (e.g. sslmode=disable&connect_timeout=5)
-  # DB_PARAMS: ""       
-
-
-# Optional Secret containing DB credentials
-secret:
-  create: false
-  name: eventrouter-db
-
-ingress:
-  enabled: false
-  className: "nginx"
-  annotations: 
-    # Ingress class già specificata con className
-    # TLS automatico via cert-manager se attivo
-    kubernetes.io/tls-acme: "true"
-    # Timeout per SSE / streaming
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-    nginx.ingress.kubernetes.io/connection-proxy-header: "keep-alive"
-    
-  hosts:
-    - host: events-presenter.example.com
-      paths:
-        - path: /notifications
-          pathType: Prefix
-        - path: /events
-          pathType: Prefix
-
-  tls:
-    - secretName: events-presenter-tls
-      hosts:
-        - events-presenter.example.com
-
-resources:
-  requests:
-    cpu: 100m
-    memory: 128Mi
-  limits:
-    cpu: 500m
-    memory: 512Mi
-
-probes:
-  readiness:
-    path: /readyz
-    initialDelaySeconds: 45
-    periodSeconds: 90
-  liveness:
-    path: /livez
-    initialDelaySeconds: 45
-    periodSeconds: 90
+  # Database name
+  # DB_NAME: ""
