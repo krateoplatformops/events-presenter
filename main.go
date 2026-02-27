@@ -18,6 +18,8 @@ import (
 	"github.com/krateoplatformops/events-presenter/internal/probes"
 	"github.com/krateoplatformops/events-presenter/internal/queue"
 	pgutil "github.com/krateoplatformops/events-presenter/internal/util/pg"
+	"github.com/krateoplatformops/plumbing/server/use"
+	"github.com/krateoplatformops/plumbing/server/use/cors"
 )
 
 func main() {
@@ -70,9 +72,26 @@ func main() {
 	mux.HandleFunc("/livez", health.LivenessHandler())
 	mux.HandleFunc("/readyz", health.ReadinessHandler())
 
+	chain := use.NewChain(
+		use.CORS(cors.Options{
+			AllowedOrigins: []string{"*"},
+			AllowedMethods: []string{"GET", "POST", "OPTIONS"},
+			AllowedHeaders: []string{
+				"Accept",
+				"Authorization",
+				"Content-Type",
+				"X-Auth-Code",
+				"X-Krateo-TraceId",
+			},
+			ExposedHeaders:   []string{"Link"},
+			AllowCredentials: true,
+			MaxAge:           300, // Maximum value not ignored by any of major browsers
+		}),
+	)
+
 	server := &http.Server{
 		Addr:         ":" + strconv.Itoa(cfg.Port),
-		Handler:      mux,
+		Handler:      chain.Then(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
