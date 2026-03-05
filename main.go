@@ -15,9 +15,9 @@ import (
 
 	"github.com/krateoplatformops/events-presenter/internal/config"
 	"github.com/krateoplatformops/events-presenter/internal/handlers"
-	"github.com/krateoplatformops/events-presenter/internal/probes"
 	"github.com/krateoplatformops/events-presenter/internal/queue"
-	pgutil "github.com/krateoplatformops/events-presenter/internal/util/pg"
+	"github.com/krateoplatformops/plumbing/pgutil"
+	"github.com/krateoplatformops/plumbing/server/probes"
 	"github.com/krateoplatformops/plumbing/server/use"
 	"github.com/krateoplatformops/plumbing/server/use/cors"
 )
@@ -38,8 +38,6 @@ func main() {
 	}
 	defer pool.Close()
 	cfg.Log.Info("PostgreSQL is ready.")
-
-	health := probes.New(pool)
 
 	// Queue
 	q := queue.NewQueue(1000, 8)
@@ -69,8 +67,8 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/notifications", handlers.EventsSSEHandler(hub))
 	mux.HandleFunc("/events", handlers.ResourcesHandler(pool))
-	mux.HandleFunc("/livez", health.LivenessHandler())
-	mux.HandleFunc("/readyz", health.ReadinessHandler())
+	// Register common livez, readyz porbes
+	probes.Register(mux, cfg.Log, pool, time.Second)
 
 	chain := use.NewChain(
 		use.CORS(cors.Options{
@@ -105,7 +103,6 @@ func main() {
 		}
 	}()
 
-	health.SetReady(true)
 	log.Println("Application is ready")
 
 	// --- WAIT FOR SHUTDOWN SIGNAL OR SERVER ERROR ---
@@ -117,8 +114,6 @@ func main() {
 	}
 
 	// --- GRACEFUL SHUTDOWN ---
-	health.SetShutdownStarted()
-	health.SetReady(false)
 	log.Println("Starting graceful shutdown...")
 
 	var wg sync.WaitGroup
