@@ -1,3 +1,7 @@
+service:
+  type: LoadBalancer
+  port: 8083
+
 secret:
   name: events-stack-db # Name of the Kubernetes Secret containing DB_USER and DB_PASS keys for database credentials
 
