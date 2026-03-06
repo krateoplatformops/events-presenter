@@ -30,8 +30,22 @@ type ResourcesResponse struct {
 
 func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// parse params
-		params, err := sql.ResourcesQueryParamsFromHTTPRequest(r)
+		var (
+			params sql.ResourcesQueryParams
+			err    error
+		)
+
+		switch r.Method {
+		case http.MethodGet:
+			params, err = sql.ResourcesQueryParamsFromHTTPRequest(r)
+		case http.MethodPost:
+			params, err = sql.ResourcesQueryJSONFromHTTPRequest(r)
+		default:
+			w.Header().Set("Allow", "GET, POST")
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
 		if err != nil {
 			http.Error(w, fmt.Sprintf("invalid params: %v", err), http.StatusBadRequest)
 			return
