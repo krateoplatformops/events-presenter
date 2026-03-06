@@ -1,12 +1,12 @@
 package handlers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 	"time"
 
@@ -86,8 +86,105 @@ func TestResourcesPagination_MultiPage(t *testing.T) {
 	}
 }
 
+func TestResourcesPostPagination_MultiPage(t *testing.T) {
+	db, cleanup := setupTestPostgres(t)
+	defer cleanup()
+
+	applySchema(t, db)
+
+	now := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+
+	seedEvents(t, db, seedOptions{
+		Cluster:       "cluster-a",
+		Namespace:     "default",
+		Kind:          "Pod",
+		Resources:     500,
+		EventsPerRes:  2,
+		StartTime:     now,
+		DeltaPerEvent: time.Second,
+	})
+
+	handler := ResourcesHandler(db)
+
+	const pageSize = 100
+
+	var (
+		cursor string
+		total  int
+		page   int
+	)
+
+	for {
+		payload := map[string]any{
+			"cluster":   "cluster-a",
+			"namespace": "default",
+			"kind":      "Pod",
+			"limit":     pageSize,
+		}
+		if cursor != "" {
+			payload["cursor"] = cursor
+		}
+
+		resp := callResourcesPOST(t, handler, payload)
+
+		items := extractItems(t, resp)
+		cursorVal, _ := resp["cursor"].(string)
+
+		t.Logf("page=%d items=%d cursor=%s", page, len(items), cursorVal)
+
+		total += len(items)
+		page++
+
+		if len(items) == 0 {
+			if cursorVal != "" {
+				t.Fatal("cursor must be empty on final page")
+			}
+			break
+		}
+
+		if len(items) == pageSize {
+			if cursorVal == "" {
+				t.Fatal("missing cursor on non-final page")
+			}
+			cursor = cursorVal
+			continue
+		}
+
+		if cursorVal != "" {
+			t.Fatal("cursor must be empty on last partial page")
+		}
+
+		break
+	}
+
+	if total != 500 {
+		t.Fatalf("expected 500 resources, got %d", total)
+	}
+}
+
+func TestResourcesHandler_MethodNotAllowed(t *testing.T) {
+	handler := ResourcesHandler(nil)
+
+	req := httptest.NewRequest(http.MethodPut, "/events", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusMethodNotAllowed {
+		t.Fatalf("expected status %d, got %d", http.StatusMethodNotAllowed, rec.Code)
+	}
+
+	if allow := rec.Header().Get("Allow"); allow != "GET, POST" {
+		t.Fatalf("expected Allow header %q, got %q", "GET, POST", allow)
+	}
+}
+
 func setupTestPostgres(t *testing.T) (*pgxpool.Pool, func()) {
 	ctx := context.Background()
+	defer func() {
+		if r := recover(); r != nil {
+			t.Skipf("skipping integration test: docker not available (%v)", r)
+		}
+	}()
 
 	container, err := postgres.RunContainer(ctx,
 		postgres.WithDatabase("testdb"),
@@ -161,6 +258,36 @@ func callResources(
 	return resp
 }
 
+func callResourcesPOST(
+	t *testing.T,
+	handler http.Handler,
+	payload map[string]any,
+) map[string]any {
+	t.Helper()
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/events", bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
+		t.Fatal(err)
+	}
+
+	return resp
+}
+
 type seedOptions struct {
 	Cluster       string
 	Namespace     string
@@ -203,12 +330,22 @@ func seedEvents(t *testing.T, db *pgxpool.Pool, opt seedOptions) {
 }
 
 func applySchema(t *testing.T, db *pgxpool.Pool) {
-	sqlBytes, err := os.ReadFile("../../../deviser/internal/config/assets/schema.sql")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	_, err = db.Exec(context.Background(), string(sqlBytes))
+	_, err := db.Exec(context.Background(), `
+CREATE TABLE IF NOT EXISTS k8s_events (
+	created_at TIMESTAMPTZ NOT NULL,
+	cluster_name TEXT NOT NULL,
+	uid TEXT NOT NULL,
+	global_uid TEXT NOT NULL,
+	namespace TEXT NOT NULL,
+	resource_kind TEXT NOT NULL,
+	resource_name TEXT NOT NULL,
+	event_type TEXT NOT NULL,
+	reason TEXT NULL,
+	message TEXT NULL,
+	raw JSONB NOT NULL,
+	resource_version TEXT NOT NULL
+) PARTITION BY RANGE (created_at);
+`)
 	if err != nil {
 		t.Fatal(err)
 	}

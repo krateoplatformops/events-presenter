@@ -48,13 +48,21 @@ Streams events to connected clients in real time.
 curl -N http://localhost:8083/notifications
 ```
 
-### `GET /events`
+### `GET /events` and `POST /events`
 
 Returns event-related resources from PostgreSQL.
 
 ```sh
 curl http://localhost:8083/events
 ```
+
+```sh
+curl --request POST http://localhost:8083/events \
+  --header "Content-Type: application/json" \
+  --data '{"cluster":"cluster-a","limit":100}'
+```
+
+Detailed search and pagination examples are available in [`SEARCH.md`](./SEARCH.md).
 
 ## Health Checks
 
