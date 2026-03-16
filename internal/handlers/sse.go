@@ -27,7 +27,7 @@ func EventsSSEHandler(hub *EventHub) http.HandlerFunc {
 			select {
 			case ev := <-ch:
 				data, _ := json.Marshal(ev)
-				fmt.Fprintf(w, "event: k8s-event\n")
+				fmt.Fprintf(w, "event: krateo\n")
 				fmt.Fprintf(w, "data: %s\n\n", data)
 				flusher.Flush()
 
