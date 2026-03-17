@@ -72,7 +72,9 @@ func main() {
 
 	chain := use.NewChain(
 		use.CORS(cors.Options{
-			AllowedOrigins: []string{"*"},
+			AllowOriginFunc: func(r *http.Request, origin string) bool {
+				return true
+			},
 			AllowedMethods: []string{"GET", "POST", "OPTIONS"},
 			AllowedHeaders: []string{
 				"Accept",
@@ -82,7 +84,7 @@ func main() {
 				"X-Krateo-TraceId",
 			},
 			ExposedHeaders:   []string{"Link"},
-			AllowCredentials: true,
+			AllowCredentials: false,
 			MaxAge:           300, // Maximum value not ignored by any of major browsers
 		}),
 	)
@@ -91,7 +93,7 @@ func main() {
 		Addr:         ":" + strconv.Itoa(cfg.Port),
 		Handler:      chain.Then(mux),
 		ReadTimeout:  15 * time.Second,
-		WriteTimeout: 15 * time.Second,
+		WriteTimeout: 0, // SSE connections can stay open indefinitely.
 		IdleTimeout:  60 * time.Second,
 	}
 
