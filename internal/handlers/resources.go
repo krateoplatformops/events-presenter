@@ -14,14 +14,14 @@ type ResourceEvent struct {
 	GlobalUID         string    `json:"global_uid"`
 	InvolvedObjectUID string    `json:"involved_object_uid,omitempty"`
 	ClusterName       string    `json:"cluster_name"`
-	Namespace    string    `json:"namespace"`
-	ResourceKind string    `json:"resource_kind"`
-	ResourceName string    `json:"resource_name"`
-	EventType    string    `json:"event_type"`
-	Reason       *string   `json:"reason,omitempty"`
-	Message      *string   `json:"message,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	Raw          string    `json:"raw,omitempty"` // JSON as string
+	Namespace         string    `json:"namespace"`
+	ResourceKind      string    `json:"resource_kind"`
+	ResourceName      string    `json:"resource_name"`
+	EventType         string    `json:"event_type"`
+	Reason            *string   `json:"reason,omitempty"`
+	Message           *string   `json:"message,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	Raw               string    `json:"raw,omitempty"` // JSON as string
 }
 
 type ResourcesResponse struct {

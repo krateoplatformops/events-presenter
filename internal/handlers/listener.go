@@ -182,10 +182,12 @@ func loadLatestEvents(
 			&ev.Reason,
 			&ev.Message,
 			&ev.CreatedAt,
-			&rawJSON,
+			&rawJSON, // scan raw JSON as bytes to extract involvedObjectUID
 		); err != nil {
 			return nil, err
 		}
+		// Note that we do not set `ev.Raw` since we do not want to have it in the SSE payload,
+		// but we do want to extract the involvedObjectUID from it.
 		ev.InvolvedObjectUID = involvedObjectUID(rawJSON)
 		res = append(res, ev)
 	}
