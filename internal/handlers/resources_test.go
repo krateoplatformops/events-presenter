@@ -469,8 +469,6 @@ INSERT INTO k8s_events (
 
 	ev := events[0]
 
-	// These assertions would have caught the old bug where event_type
-	// was scanned into ResourceKind and most fields were empty.
 	assertField(t, "GlobalUID", ev.GlobalUID, globalUID)
 	assertField(t, "ClusterName", ev.ClusterName, cluster)
 	assertField(t, "Namespace", ev.Namespace, ns)
