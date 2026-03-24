@@ -380,6 +380,7 @@ func insertEvent(
 ) {
 	raw := map[string]any{
 		"involvedObject": map[string]any{
+			"uid":    uid,
 			"labels": labels,
 		},
 	}
@@ -412,6 +413,92 @@ INSERT INTO k8s_events (
 	)
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestLoadLatestEvents_FieldMapping(t *testing.T) {
+	db, cleanup := setupTestPostgres(t)
+	defer cleanup()
+
+	applySchema(t, db)
+
+	now := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+	createDailyPartition(t, db, now)
+
+	const (
+		cluster   = "test-cluster"
+		uid       = "obj-abc-123"
+		ns        = "production"
+		kind      = "Pod"
+		name      = "my-pod-xyz"
+		eventType = "Warning"
+		reason    = "BackOff"
+		message   = "Back-off restarting failed container"
+	)
+	globalUID := cluster + ":" + uid
+
+	raw := map[string]any{
+		"involvedObject": map[string]any{
+			"uid":    uid,
+			"labels": map[string]string{"app": "test"},
+		},
+	}
+	rawJSON, _ := json.Marshal(raw)
+
+	_, err := db.Exec(context.Background(), `
+INSERT INTO k8s_events (
+	created_at, cluster_name, uid, global_uid,
+	namespace, resource_kind, resource_name,
+	event_type, reason, message, raw, resource_version
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+		now, cluster, uid, globalUID,
+		ns, kind, name,
+		eventType, reason, message, rawJSON, "1",
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	events, err := loadLatestEvents(context.Background(), db, globalUID)
+	if err != nil {
+		t.Fatalf("loadLatestEvents: %v", err)
+	}
+	if len(events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(events))
+	}
+
+	ev := events[0]
+
+	// These assertions would have caught the old bug where event_type
+	// was scanned into ResourceKind and most fields were empty.
+	assertField(t, "GlobalUID", ev.GlobalUID, globalUID)
+	assertField(t, "ClusterName", ev.ClusterName, cluster)
+	assertField(t, "Namespace", ev.Namespace, ns)
+	assertField(t, "ResourceKind", ev.ResourceKind, kind)
+	assertField(t, "ResourceName", ev.ResourceName, name)
+	assertField(t, "EventType", ev.EventType, eventType)
+	assertField(t, "InvolvedObjectUID", ev.InvolvedObjectUID, uid)
+
+	if ev.Reason == nil || *ev.Reason != reason {
+		t.Fatalf("Reason: expected %q, got %v", reason, ev.Reason)
+	}
+	if ev.Message == nil || *ev.Message != message {
+		t.Fatalf("Message: expected %q, got %v", message, ev.Message)
+	}
+	if ev.CreatedAt.IsZero() {
+		t.Fatal("CreatedAt must not be zero")
+	}
+
+	// raw must NOT be populated for SSE events
+	if ev.Raw != "" {
+		t.Fatalf("Raw should be empty for SSE events, got %q", ev.Raw)
+	}
+}
+
+func assertField(t *testing.T, field, got, want string) {
+	t.Helper()
+	if got != want {
+		t.Fatalf("%s: expected %q, got %q", field, want, got)
 	}
 }
 

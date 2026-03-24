@@ -149,10 +149,15 @@ func loadLatestEvents(
 	rows, err := db.Query(ctx, `
         SELECT
             global_uid,
+            cluster_name,
+            namespace,
+            resource_kind,
+            resource_name,
             event_type,
             reason,
             message,
-            created_at
+            created_at,
+            raw
         FROM k8s_events
         WHERE global_uid = $1
         ORDER BY created_at DESC
@@ -166,15 +171,22 @@ func loadLatestEvents(
 	var res []ResourceEvent
 	for rows.Next() {
 		var ev ResourceEvent
+		var rawJSON []byte
 		if err := rows.Scan(
 			&ev.GlobalUID,
+			&ev.ClusterName,
+			&ev.Namespace,
 			&ev.ResourceKind,
+			&ev.ResourceName,
+			&ev.EventType,
 			&ev.Reason,
 			&ev.Message,
 			&ev.CreatedAt,
+			&rawJSON,
 		); err != nil {
 			return nil, err
 		}
+		ev.InvolvedObjectUID = involvedObjectUID(rawJSON)
 		res = append(res, ev)
 	}
 

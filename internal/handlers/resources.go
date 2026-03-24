@@ -11,8 +11,9 @@ import (
 )
 
 type ResourceEvent struct {
-	GlobalUID    string    `json:"global_uid"`
-	ClusterName  string    `json:"cluster_name"`
+	GlobalUID         string    `json:"global_uid"`
+	InvolvedObjectUID string    `json:"involved_object_uid,omitempty"`
+	ClusterName       string    `json:"cluster_name"`
 	Namespace    string    `json:"namespace"`
 	ResourceKind string    `json:"resource_kind"`
 	ResourceName string    `json:"resource_name"`
@@ -87,6 +88,7 @@ func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
 				return
 			}
 			e.Raw = string(rawJSON)
+			e.InvolvedObjectUID = involvedObjectUID(rawJSON)
 			resources = append(resources, e)
 		}
 		if rows.Err() != nil {
@@ -118,4 +120,16 @@ func lastRowCursor(rows []ResourceEvent) sql.EncodedCursor {
 	}
 
 	return sql.EncodeCursor(&rc)
+}
+
+func involvedObjectUID(rawJSON []byte) string {
+	var obj struct {
+		InvolvedObject struct {
+			UID string `json:"uid"`
+		} `json:"involvedObject"`
+	}
+	if json.Unmarshal(rawJSON, &obj) == nil {
+		return obj.InvolvedObject.UID
+	}
+	return ""
 }

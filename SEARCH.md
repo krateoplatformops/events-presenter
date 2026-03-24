@@ -13,6 +13,24 @@ Supported methods:
 
 Internally, the query keeps only the newest row per `global_uid`, then applies filters, pagination, and ordering.
 
+### Response Fields
+
+Each resource object contains:
+
+| Field | Type | Description |
+| --- | --- | --- |
+| `global_uid` | string | Unique identifier (`cluster_name:uid`). |
+| `involved_object_uid` | string | UID of the involved Kubernetes object (extracted from `raw`). |
+| `cluster_name` | string | Source cluster name. |
+| `namespace` | string | Kubernetes namespace. |
+| `resource_kind` | string | Resource kind (e.g. `Pod`, `Deployment`). |
+| `resource_name` | string | Resource name. |
+| `event_type` | string | Kubernetes event type (e.g. `Normal`, `Warning`). |
+| `reason` | string or null | Event reason (e.g. `CannotObserveExternalResource`). |
+| `message` | string or null | Human-readable event message. |
+| `created_at` | RFC3339 timestamp | When the event was created. |
+| `raw` | JSON string | Full original event payload (only in `/events`, omitted from SSE `/notifications`). |
+
 ## Query Parameters
 
 All filters are optional and are combined with `AND`.
