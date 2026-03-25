@@ -339,6 +339,7 @@ CREATE TABLE IF NOT EXISTS k8s_events (
 	namespace TEXT NOT NULL,
 	resource_kind TEXT NOT NULL,
 	resource_name TEXT NOT NULL,
+	involved_object_uid TEXT NULL,
 	event_type TEXT NOT NULL,
 	reason TEXT NULL,
 	message TEXT NULL,
@@ -395,10 +396,11 @@ INSERT INTO k8s_events (
 	namespace,
 	resource_kind,
 	resource_name,
+	involved_object_uid,
 	event_type,
 	raw,
 	resource_version
-) VALUES ($1,$2,$3,$4,$5,$6,$7,'Normal',$8,$9)
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Normal',$9,$10)
 `,
 		createdAt,
 		cluster,
@@ -407,6 +409,7 @@ INSERT INTO k8s_events (
 		ns,
 		kind,
 		name,
+		uid,
 		rawJSON,
 		rv,
 	)
