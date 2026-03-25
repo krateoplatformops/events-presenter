@@ -149,6 +149,11 @@ func loadLatestEvents(
 	rows, err := db.Query(ctx, `
         SELECT
             global_uid,
+			cluster_name,
+			namespace,
+			resource_kind,
+			resource_name,
+			involved_object_uid,
             event_type,
             reason,
             message,
@@ -168,7 +173,12 @@ func loadLatestEvents(
 		var ev ResourceEvent
 		if err := rows.Scan(
 			&ev.GlobalUID,
+			&ev.ClusterName,
+			&ev.Namespace,
 			&ev.ResourceKind,
+			&ev.ResourceName,
+			&ev.InvolvedObjectUID,
+			&ev.EventType,
 			&ev.Reason,
 			&ev.Message,
 			&ev.CreatedAt,

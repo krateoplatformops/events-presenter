@@ -11,16 +11,17 @@ import (
 )
 
 type ResourceEvent struct {
-	GlobalUID    string    `json:"global_uid"`
-	ClusterName  string    `json:"cluster_name"`
-	Namespace    string    `json:"namespace"`
-	ResourceKind string    `json:"resource_kind"`
-	ResourceName string    `json:"resource_name"`
-	EventType    string    `json:"event_type"`
-	Reason       *string   `json:"reason,omitempty"`
-	Message      *string   `json:"message,omitempty"`
-	CreatedAt    time.Time `json:"created_at"`
-	Raw          string    `json:"raw,omitempty"` // JSON as string
+	GlobalUID         string    `json:"global_uid"`
+	ClusterName       string    `json:"cluster_name"`
+	Namespace         string    `json:"namespace"`
+	ResourceKind      string    `json:"resource_kind"`
+	ResourceName      string    `json:"resource_name"`
+	InvolvedObjectUID string    `json:"involved_object_uid,omitempty"`
+	EventType         string    `json:"event_type"`
+	Reason            *string   `json:"reason,omitempty"`
+	Message           *string   `json:"message,omitempty"`
+	CreatedAt         time.Time `json:"created_at"`
+	Raw               string    `json:"raw,omitempty"` // JSON as string
 }
 
 type ResourcesResponse struct {
@@ -77,6 +78,7 @@ func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
 				&e.Namespace,
 				&e.ResourceKind,
 				&e.ResourceName,
+				&e.InvolvedObjectUID,
 				&e.EventType,
 				&e.Reason,
 				&e.Message,

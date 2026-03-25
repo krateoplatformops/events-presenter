@@ -247,6 +247,7 @@ WITH latest AS (
         namespace,
         resource_kind,
         resource_name,
+        involved_object_uid,
         event_type,
         reason,
         message,
