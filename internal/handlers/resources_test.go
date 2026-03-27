@@ -34,7 +34,7 @@ func TestResourcesPagination_MultiPage(t *testing.T) {
 		DeltaPerEvent: time.Second,
 	})
 
-	handler := ResourcesHandler(db)
+	handler := ResourcesHandler(db, nil)
 
 	const pageSize = 100
 
@@ -104,7 +104,7 @@ func TestResourcesPostPagination_MultiPage(t *testing.T) {
 		DeltaPerEvent: time.Second,
 	})
 
-	handler := ResourcesHandler(db)
+	handler := ResourcesHandler(db, nil)
 
 	const pageSize = 100
 
@@ -163,7 +163,7 @@ func TestResourcesPostPagination_MultiPage(t *testing.T) {
 }
 
 func TestResourcesHandler_MethodNotAllowed(t *testing.T) {
-	handler := ResourcesHandler(nil)
+	handler := ResourcesHandler(nil, nil)
 
 	req := httptest.NewRequest(http.MethodPut, "/events", nil)
 	rec := httptest.NewRecorder()
@@ -175,6 +175,89 @@ func TestResourcesHandler_MethodNotAllowed(t *testing.T) {
 
 	if allow := rec.Header().Get("Allow"); allow != "GET, POST" {
 		t.Fatalf("expected Allow header %q, got %q", "GET, POST", allow)
+	}
+}
+
+func TestResourcesHandler_CompositionIDPresentAndAbsent(t *testing.T) {
+	db, cleanup := setupTestPostgres(t)
+	defer cleanup()
+
+	applySchema(t, db)
+
+	now := time.Date(2026, 1, 10, 12, 0, 0, 0, time.UTC)
+	createDailyPartition(t, db, now)
+
+	compID := "11111111-1111-1111-1111-111111111111"
+
+	insertEventWithCompositionID(
+		t,
+		db,
+		now,
+		"cluster-a",
+		"uid-with-comp",
+		"default",
+		"Pod",
+		"res-with-comp",
+		"1",
+		map[string]string{"app": "Pod"},
+		&compID,
+	)
+
+	insertEventWithCompositionID(
+		t,
+		db,
+		now.Add(-time.Second),
+		"cluster-a",
+		"uid-no-comp",
+		"default",
+		"Pod",
+		"res-no-comp",
+		"1",
+		map[string]string{"app": "Pod"},
+		nil,
+	)
+
+	handler := ResourcesHandler(db, nil)
+	resp := callResources(t, handler, "", 10)
+	items := extractItems(t, resp)
+
+	if len(items) != 2 {
+		t.Fatalf("expected 2 resources, got %d", len(items))
+	}
+
+	foundWith := false
+	foundWithout := false
+
+	for _, it := range items {
+		obj, ok := it.(map[string]any)
+		if !ok {
+			t.Fatalf("resource is not an object: %#v", it)
+		}
+
+		name, _ := obj["resource_name"].(string)
+		switch name {
+		case "res-with-comp":
+			v, ok := obj["composition_id"].(string)
+			if !ok {
+				t.Fatalf("expected composition_id for %q", name)
+			}
+			if v != compID {
+				t.Fatalf("unexpected composition_id for %q: %q", name, v)
+			}
+			foundWith = true
+		case "res-no-comp":
+			if _, ok := obj["composition_id"]; ok {
+				t.Fatalf("composition_id must be omitted when null for %q", name)
+			}
+			foundWithout = true
+		}
+	}
+
+	if !foundWith {
+		t.Fatal("resource with composition_id not found")
+	}
+	if !foundWithout {
+		t.Fatal("resource without composition_id not found")
 	}
 }
 
@@ -343,6 +426,7 @@ CREATE TABLE IF NOT EXISTS k8s_events (
 	event_type TEXT NOT NULL,
 	reason TEXT NULL,
 	message TEXT NULL,
+	composition_id UUID NULL,
 	raw JSONB NOT NULL,
 	resource_version TEXT NOT NULL
 ) PARTITION BY RANGE (created_at);
@@ -408,8 +492,57 @@ INSERT INTO k8s_events (
 		cluster+":"+uid,
 		ns,
 		kind,
+	name,
+	uid,
+	rawJSON,
+	rv,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func insertEventWithCompositionID(
+	t *testing.T,
+	db *pgxpool.Pool,
+	createdAt time.Time,
+	cluster, uid, ns, kind, name, rv string,
+	labels map[string]string,
+	compositionID *string,
+) {
+	raw := map[string]any{
+		"involvedObject": map[string]any{
+			"labels": labels,
+		},
+	}
+
+	rawJSON, _ := json.Marshal(raw)
+
+	_, err := db.Exec(context.Background(), `
+INSERT INTO k8s_events (
+	created_at,
+	cluster_name,
+	uid,
+	global_uid,
+	namespace,
+	resource_kind,
+	resource_name,
+	involved_object_uid,
+	event_type,
+	composition_id,
+	raw,
+	resource_version
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Normal',$9::uuid,$10,$11)
+`,
+		createdAt,
+		cluster,
+		uid,
+		cluster+":"+uid,
+		ns,
+		kind,
 		name,
 		uid,
+		compositionID,
 		rawJSON,
 		rv,
 	)

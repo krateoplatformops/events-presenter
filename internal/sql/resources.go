@@ -24,6 +24,8 @@ type ResourcesQueryParams struct {
 	Namespace string
 	Kind      string
 	Name      string
+	// CompositionID filters resources by k8s_events.composition_id.
+	CompositionID string
 	// Labels is a JSON object (encoded as string) used to filter
 	// Kubernetes labels via JSONB containment (@>).
 	Labels string // raw JSON string
@@ -47,6 +49,7 @@ type ResourcesQueryParams struct {
 //   - namespace
 //   - kind
 //   - name
+//   - composition_id
 //   - labels (JSON object, e.g. {"app":"nginx"})
 //   - since (RFC3339 timestamp)
 //   - limit
@@ -74,14 +77,15 @@ func ResourcesQueryParamsFromHTTPRequest(r *http.Request) (ResourcesQueryParams,
 	}
 
 	res := ResourcesQueryParams{
-		Cluster:   q.Get("cluster"),
-		Namespace: q.Get("namespace"),
-		Kind:      q.Get("kind"),
-		Name:      q.Get("name"),
-		Labels:    q.Get("labels"),
-		Since:     since,
-		Limit:     limit,
-		Cursor:    EncodedCursor(q.Get("cursor")),
+		Cluster:       q.Get("cluster"),
+		Namespace:     q.Get("namespace"),
+		Kind:          q.Get("kind"),
+		Name:          q.Get("name"),
+		CompositionID: q.Get("composition_id"),
+		Labels:        q.Get("labels"),
+		Since:         since,
+		Limit:         limit,
+		Cursor:        EncodedCursor(q.Get("cursor")),
 	}
 
 	if res.Labels != "" {
@@ -95,14 +99,15 @@ func ResourcesQueryParamsFromHTTPRequest(r *http.Request) (ResourcesQueryParams,
 }
 
 type resourcesQueryJSONPayload struct {
-	Cluster   string         `json:"cluster"`
-	Namespace string         `json:"namespace"`
-	Kind      string         `json:"kind"`
-	Name      string         `json:"name"`
-	Labels    map[string]any `json:"labels"`
-	Since     *time.Time     `json:"since"`
-	Limit     *int           `json:"limit"`
-	Cursor    EncodedCursor  `json:"cursor"`
+	Cluster       string         `json:"cluster"`
+	Namespace     string         `json:"namespace"`
+	Kind          string         `json:"kind"`
+	Name          string         `json:"name"`
+	CompositionID string         `json:"composition_id"`
+	Labels        map[string]any `json:"labels"`
+	Since         *time.Time     `json:"since"`
+	Limit         *int           `json:"limit"`
+	Cursor        EncodedCursor  `json:"cursor"`
 }
 
 // ResourcesQueryJSONFromHTTPRequest parses a JSON body from an HTTP request
@@ -113,6 +118,7 @@ type resourcesQueryJSONPayload struct {
 //   - namespace
 //   - kind
 //   - name
+//   - composition_id
 //   - labels (JSON object)
 //   - since (RFC3339 timestamp)
 //   - limit
@@ -147,13 +153,14 @@ func ResourcesQueryJSONFromHTTPRequest(r *http.Request) (ResourcesQueryParams, e
 	}
 
 	res := ResourcesQueryParams{
-		Cluster:   payload.Cluster,
-		Namespace: payload.Namespace,
-		Kind:      payload.Kind,
-		Name:      payload.Name,
-		Since:     payload.Since,
-		Limit:     limit,
-		Cursor:    payload.Cursor,
+		Cluster:       payload.Cluster,
+		Namespace:     payload.Namespace,
+		Kind:          payload.Kind,
+		Name:          payload.Name,
+		CompositionID: payload.CompositionID,
+		Since:         payload.Since,
+		Limit:         limit,
+		Cursor:        payload.Cursor,
 	}
 
 	if payload.Labels != nil {
@@ -187,6 +194,10 @@ func BuildResourcesQuery(p ResourcesQueryParams) (string, []any, error) {
 
 	if p.Name != "" {
 		cte.Where("resource_name ILIKE ?", "%"+p.Name+"%")
+	}
+
+	if p.CompositionID != "" {
+		cte.Where("composition_id = ?::uuid", p.CompositionID)
 	}
 
 	if p.Since != nil {
@@ -251,6 +262,7 @@ WITH latest AS (
         event_type,
         reason,
         message,
+        composition_id,
         created_at,
         raw
     FROM k8s_events

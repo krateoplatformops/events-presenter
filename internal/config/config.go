@@ -16,6 +16,8 @@ const (
 	serviceName           = "events-presenter"
 	defaultDbReadyTimeout = 4 * time.Minute
 	defaultDebug          = false
+	defaultOtelEnabled    = true
+	defaultOtelInterval   = 30 * time.Second
 )
 
 type Config struct {
@@ -23,6 +25,8 @@ type Config struct {
 	Debug          bool
 	DbURL          string
 	DbReadyTimeout time.Duration
+	OTelEnabled    bool
+	OTelInterval   time.Duration
 	Log            *slog.Logger
 }
 
@@ -73,6 +77,16 @@ func Setup() *Config {
 		"maximum time to wait for PostgreSQL to become ready",
 	)
 
+	cfgOTelEnabled := flag.Bool("otel-enabled",
+		env.Bool("OTEL_ENABLED", defaultOtelEnabled),
+		"enable OpenTelemetry metrics exporter",
+	)
+
+	cfgOTelInterval := flag.Duration("otel-export-interval",
+		env.Duration("OTEL_EXPORT_INTERVAL", defaultOtelInterval),
+		"OpenTelemetry metric export interval",
+	)
+
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Flags:")
 		flag.PrintDefaults()
@@ -83,6 +97,8 @@ func Setup() *Config {
 	cfg.Port = *cfgPort
 	cfg.Debug = *cfgDebug
 	cfg.DbReadyTimeout = *cfgDbReadyTimeout
+	cfg.OTelEnabled = *cfgOTelEnabled
+	cfg.OTelInterval = *cfgOTelInterval
 
 	cfg.Log = logutil.New(serviceName, cfg.Debug)
 

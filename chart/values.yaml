@@ -140,6 +140,12 @@ config:
   # Maximum time to wait for PostgreSQL to become ready
   DB_READY_TIMEOUT: "5m"
 
+  # Enable OpenTelemetry metrics exporter
+  OTEL_ENABLED: "false"
+
+  # OpenTelemetry metric export interval
+  OTEL_EXPORT_INTERVAL: "30s"
+
   # Extra query parameters (e.g. sslmode=disable&connect_timeout=5)
   DB_PARAMS: "sslmode=disable&connect_timeout=5"
 

@@ -8,6 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/krateoplatformops/events-presenter/internal/sql"
+	"github.com/krateoplatformops/events-presenter/internal/telemetry"
 )
 
 type ResourceEvent struct {
@@ -20,6 +21,7 @@ type ResourceEvent struct {
 	EventType         string    `json:"event_type"`
 	Reason            *string   `json:"reason,omitempty"`
 	Message           *string   `json:"message,omitempty"`
+	CompositionID     *string   `json:"composition_id,omitempty"`
 	CreatedAt         time.Time `json:"created_at"`
 	Raw               string    `json:"raw,omitempty"` // JSON as string
 }
@@ -29,8 +31,21 @@ type ResourcesResponse struct {
 	Cursor    sql.EncodedCursor `json:"cursor,omitempty"`
 }
 
-func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
+func ResourcesHandler(db *pgxpool.Pool, metrics *telemetry.Metrics) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		started := time.Now()
+		method := r.Method
+		statusCode := http.StatusOK
+		defer func() {
+			metrics.RecordEventsRequest(r.Context(), method, statusCode, time.Since(started))
+		}()
+
+		fail := func(stage, msg string, status int) {
+			statusCode = status
+			metrics.IncEventsError(r.Context(), method, stage, status)
+			http.Error(w, msg, status)
+		}
+
 		var (
 			params sql.ResourcesQueryParams
 			err    error
@@ -43,26 +58,26 @@ func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
 			params, err = sql.ResourcesQueryJSONFromHTTPRequest(r)
 		default:
 			w.Header().Set("Allow", "GET, POST")
-			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			fail("method_not_allowed", "method not allowed", http.StatusMethodNotAllowed)
 			return
 		}
 
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid params: %v", err), http.StatusBadRequest)
+			fail("invalid_params", fmt.Sprintf("invalid params: %v", err), http.StatusBadRequest)
 			return
 		}
 
 		// build query
 		query, args, err := sql.BuildResourcesQuery(params)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("invalid cursor: %v", err), http.StatusBadRequest)
+			fail("invalid_cursor", fmt.Sprintf("invalid cursor: %v", err), http.StatusBadRequest)
 			return
 		}
 
 		// execute
 		rows, err := db.Query(r.Context(), query, args...)
 		if err != nil {
-			http.Error(w, fmt.Sprintf("query error: %v", err), http.StatusInternalServerError)
+			fail("query_error", fmt.Sprintf("query error: %v", err), http.StatusInternalServerError)
 			return
 		}
 		defer rows.Close()
@@ -82,17 +97,18 @@ func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
 				&e.EventType,
 				&e.Reason,
 				&e.Message,
+				&e.CompositionID,
 				&e.CreatedAt,
 				&rawJSON,
 			); err != nil {
-				http.Error(w, fmt.Sprintf("scan error: %v", err), http.StatusInternalServerError)
+				fail("scan_error", fmt.Sprintf("scan error: %v", err), http.StatusInternalServerError)
 				return
 			}
 			e.Raw = string(rawJSON)
 			resources = append(resources, e)
 		}
 		if rows.Err() != nil {
-			http.Error(w, fmt.Sprintf("rows error: %v", rows.Err()), http.StatusInternalServerError)
+			fail("rows_error", fmt.Sprintf("rows error: %v", rows.Err()), http.StatusInternalServerError)
 			return
 		}
 
@@ -103,7 +119,11 @@ func ResourcesHandler(db *pgxpool.Pool) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
+		if err := json.NewEncoder(w).Encode(resp); err != nil {
+			metrics.IncEventsError(r.Context(), method, "encode_error", http.StatusOK)
+			return
+		}
+		metrics.AddEventsResourcesReturned(r.Context(), method, int64(len(resources)))
 	}
 }
 

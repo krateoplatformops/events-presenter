@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/krateoplatformops/events-presenter/internal/queue"
+	"github.com/krateoplatformops/events-presenter/internal/telemetry"
 	"github.com/krateoplatformops/events-presenter/internal/util/pg/retry"
 )
 
@@ -26,6 +27,7 @@ func RunPgListener(
 	q queue.Queuer,
 	db *pgxpool.Pool,
 	hub *EventHub,
+	metrics *telemetry.Metrics,
 ) {
 	baseBackoff := cfg.ReconnectWait
 	if baseBackoff <= 0 {
@@ -42,6 +44,7 @@ func RunPgListener(
 
 		conn, err := pgx.Connect(ctx, cfg.DSN)
 		if err != nil {
+			metrics.IncListenerConnectFailure(ctx)
 			backoff = sleepWithBackoff(ctx, backoff)
 			cfg.Log.Warn("pg listener: connect failed",
 				slog.String("backoff", backoff.String()),
@@ -50,8 +53,9 @@ func RunPgListener(
 		}
 		backoff = baseBackoff
 
-		err = listenAndServe(ctx, conn, cfg.Channel, q, db, hub, cfg.Log)
+		err = listenAndServe(ctx, conn, cfg.Channel, q, db, hub, cfg.Log, metrics)
 		if err != nil && !errors.Is(err, context.Canceled) {
+			metrics.IncListenerDisconnect(ctx)
 			cfg.Log.Error("pg listener: disconnected", slog.Any("err", err))
 		}
 
@@ -68,6 +72,7 @@ func listenAndServe(
 	db *pgxpool.Pool,
 	hub *EventHub,
 	log *slog.Logger,
+	metrics *telemetry.Metrics,
 ) error {
 	_, err := conn.Exec(ctx, "LISTEN "+pgx.Identifier{channel}.Sanitize())
 	if err != nil {
@@ -94,9 +99,11 @@ func listenAndServe(
 		}
 
 		globalUID := n.Payload
+		metrics.IncListenerNotificationReceived(ctx)
 
 		q.Push(queue.NewJob(globalUID, func(v interface{}) {
 			uid := v.(string)
+			metrics.IncListenerJobEnqueued(ctx)
 
 			queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
 			defer cancel()
@@ -108,7 +115,7 @@ func listenAndServe(
 				BaseDelay:   500 * time.Millisecond,
 				MaxDelay:    10 * time.Second,
 			}, func() ([]ResourceEvent, error) {
-				return loadLatestEvents(queryCtx, db, uid)
+				return loadLatestEvents(queryCtx, db, uid, metrics)
 			})
 			if err != nil {
 				log.Error("query error",
@@ -144,7 +151,12 @@ func loadLatestEvents(
 	ctx context.Context,
 	db *pgxpool.Pool,
 	globalUID string,
+	metrics *telemetry.Metrics,
 ) ([]ResourceEvent, error) {
+	started := time.Now()
+	defer func() {
+		metrics.RecordListenerLoadLatestDuration(ctx, time.Since(started))
+	}()
 
 	rows, err := db.Query(ctx, `
         SELECT
@@ -164,6 +176,7 @@ func loadLatestEvents(
         LIMIT 3
     `, globalUID)
 	if err != nil {
+		metrics.IncListenerLoadLatestFailure(ctx)
 		return nil, err
 	}
 	defer rows.Close()
@@ -183,9 +196,14 @@ func loadLatestEvents(
 			&ev.Message,
 			&ev.CreatedAt,
 		); err != nil {
+			metrics.IncListenerLoadLatestFailure(ctx)
 			return nil, err
 		}
 		res = append(res, ev)
+	}
+	if rows.Err() != nil {
+		metrics.IncListenerLoadLatestFailure(ctx)
+		return nil, rows.Err()
 	}
 
 	return res, nil
