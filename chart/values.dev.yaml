@@ -19,3 +19,5 @@ config:
   DB_NAME: testdb
   DB_PARAMS: "sslmode=disable&connect_timeout=5"
   DB_READY_TIMEOUT: "4m"
+  OTEL_ENABLED: "false"
+  OTEL_EXPORT_INTERVAL: "30s"

@@ -1,0 +1,628 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {
+          "type": "grafana",
+          "uid": "-- Grafana --"
+        },
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(events_presenter_startup_success_total[1h])) or sum(increase(events_presenter_startup_success[1h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Startup Success (last 1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "id": 2,
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(events_presenter_startup_failure_total[1h])) or sum(increase(events_presenter_startup_failure[1h]))",
+          "refId": "A"
+        }
+      ],
+      "title": "Startup Failures (last 1h)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 3,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(events_presenter_db_connect_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(events_presenter_db_connect_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "title": "DB Connect Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 5
+      },
+      "id": 4,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (method) (rate(events_presenter_http_events_requests_total[5m])) or sum by (method) (rate(events_presenter_http_events_requests[5m]))",
+          "legendFormat": "{{method}}",
+          "refId": "A"
+        }
+      ],
+      "title": "/events Requests / sec",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 5
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (stage) (rate(events_presenter_http_events_errors_total[5m])) or sum by (stage) (rate(events_presenter_http_events_errors[5m]))",
+          "legendFormat": "{{stage}}",
+          "refId": "A"
+        }
+      ],
+      "title": "/events Errors / sec by Stage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 13
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(events_presenter_http_events_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(events_presenter_http_events_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "title": "/events Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 13
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(events_presenter_http_events_resources_returned_total[5m])) or sum(rate(events_presenter_http_events_resources_returned[5m]))",
+          "legendFormat": "resources/s",
+          "refId": "A"
+        }
+      ],
+      "title": "/events Resources Throughput",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 13
+      },
+      "id": 8,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(events_presenter_listener_notifications_received_total[5m])) or sum(rate(events_presenter_listener_notifications_received[5m]))",
+          "legendFormat": "notifications/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(events_presenter_listener_jobs_enqueued_total[5m])) or sum(rate(events_presenter_listener_jobs_enqueued[5m]))",
+          "legendFormat": "jobs/s",
+          "refId": "B"
+        }
+      ],
+      "title": "Listener Notifications vs Jobs",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "decimals": 2,
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 0,
+        "y": 21
+      },
+      "id": 9,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(events_presenter_listener_load_latest_duration_seconds_bucket[5m])))",
+          "legendFormat": "p95",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(events_presenter_listener_load_latest_duration_seconds_bucket[5m])))",
+          "legendFormat": "p50",
+          "refId": "B"
+        }
+      ],
+      "title": "Listener loadLatest Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 8,
+        "y": 21
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(events_presenter_listener_load_latest_failure_total[1h])) or sum(increase(events_presenter_listener_load_latest_failure[1h]))",
+          "legendFormat": "load_latest_failures_1h",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(events_presenter_listener_connect_failure_total[1h])) or sum(increase(events_presenter_listener_connect_failure[1h]))",
+          "legendFormat": "connect_failures_1h",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(increase(events_presenter_listener_disconnects_total[1h])) or sum(increase(events_presenter_listener_disconnects[1h]))",
+          "legendFormat": "disconnects_1h",
+          "refId": "C"
+        }
+      ],
+      "title": "Listener Failures (last 1h)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 8,
+        "x": 16,
+        "y": 21
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "max(events_presenter_sse_clients_active)",
+          "legendFormat": "active_clients",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(events_presenter_sse_clients_connected_total[5m])) or sum(rate(events_presenter_sse_clients_connected[5m]))",
+          "legendFormat": "connected/s",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(events_presenter_sse_clients_disconnected_total[5m])) or sum(rate(events_presenter_sse_clients_disconnected[5m]))",
+          "legendFormat": "disconnected/s",
+          "refId": "C"
+        }
+      ],
+      "title": "SSE Clients",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 24,
+        "x": 0,
+        "y": 28
+      },
+      "id": 12,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(events_presenter_sse_events_broadcast_total[5m])) or sum(rate(events_presenter_sse_events_broadcast[5m]))",
+          "legendFormat": "broadcast/s",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(events_presenter_sse_events_dropped_total[5m])) or sum(rate(events_presenter_sse_events_dropped[5m]))",
+          "legendFormat": "dropped/s",
+          "refId": "B"
+        }
+      ],
+      "title": "SSE Events: Broadcast vs Dropped",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "style": "dark",
+  "tags": [
+    "events-presenter",
+    "otel",
+    "postgres",
+    "sse"
+  ],
+  "templating": {
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "Prometheus",
+          "value": "Prometheus"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "label": "Datasource",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": "prometheus",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
+  },
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Events Presenter Overview",
+  "uid": "events-presenter-overview",
+  "version": 1,
+  "weekStart": ""
+}

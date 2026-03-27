@@ -85,6 +85,8 @@ Detailed search and pagination examples are available in [`SEARCH.md`](./SEARCH.
 | `DB_PORT`          | Database port                     | `5432`      |
 | `DB_PARAMS`        | Extra connection parameters       | —           |
 | `DB_READY_TIMEOUT` | Max time to wait for DB readiness | `2m`        |
+| `OTEL_ENABLED`     | Enable OpenTelemetry metrics      | `true`      |
+| `OTEL_EXPORT_INTERVAL` | Metrics export interval      | `30s`       |
 
 > The service builds a PostgreSQL connection string from these values.
 

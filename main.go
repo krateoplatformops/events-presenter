@@ -16,6 +16,7 @@ import (
 	"github.com/krateoplatformops/events-presenter/internal/config"
 	"github.com/krateoplatformops/events-presenter/internal/handlers"
 	"github.com/krateoplatformops/events-presenter/internal/queue"
+	"github.com/krateoplatformops/events-presenter/internal/telemetry"
 	"github.com/krateoplatformops/plumbing/pgutil"
 	"github.com/krateoplatformops/plumbing/server/probes"
 	"github.com/krateoplatformops/plumbing/server/use"
@@ -28,11 +29,31 @@ func main() {
 	rootCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	metrics, shutdownMetrics, err := telemetry.Setup(rootCtx, cfg.Log, telemetry.Config{
+		Enabled:        cfg.OTelEnabled,
+		ServiceName:    "events-presenter",
+		ExportInterval: cfg.OTelInterval,
+	})
+	if err != nil {
+		cfg.Log.Error("OpenTelemetry setup failed", slog.Any("err", err))
+		os.Exit(1)
+	}
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := shutdownMetrics(ctx); err != nil {
+			cfg.Log.Warn("OpenTelemetry shutdown failed", slog.Any("err", err))
+		}
+	}()
+
 	pgCtx, cancel := context.WithTimeout(rootCtx, cfg.DbReadyTimeout)
 	defer cancel()
 
+	dbConnectStarted := time.Now()
 	pool, err := pgutil.WaitForPostgres(pgCtx, cfg.Log, cfg.DbURL)
+	metrics.RecordDBConnectDuration(rootCtx, time.Since(dbConnectStarted))
 	if err != nil {
+		metrics.IncStartupFailure(rootCtx)
 		cfg.Log.Error("cannot connect to PostgreSQL", slog.Any("err", err))
 		os.Exit(1)
 	}
@@ -45,7 +66,7 @@ func main() {
 	defer q.Terminate()
 
 	// SSE hub
-	hub := handlers.NewEventHub()
+	hub := handlers.NewEventHub(metrics)
 
 	// Listener Postgres
 	lo := handlers.PgListenerConfig{
@@ -60,13 +81,13 @@ func main() {
 
 	go func() {
 		defer close(listenerDone)
-		handlers.RunPgListener(listenerCtx, lo, q, pool, hub)
+		handlers.RunPgListener(listenerCtx, lo, q, pool, hub, metrics)
 	}()
 
 	// HTTP server
 	mux := http.NewServeMux()
 	mux.HandleFunc("/notifications", handlers.EventsSSEHandler(hub))
-	mux.HandleFunc("/events", handlers.ResourcesHandler(pool))
+	mux.HandleFunc("/events", handlers.ResourcesHandler(pool, metrics))
 	// Register common livez, readyz porbes
 	probes.Register(mux, cfg.Log, pool, time.Second)
 
@@ -106,6 +127,7 @@ func main() {
 	}()
 
 	log.Println("Application is ready")
+	metrics.IncStartupSuccess(rootCtx)
 
 	// --- WAIT FOR SHUTDOWN SIGNAL OR SERVER ERROR ---
 	select {
