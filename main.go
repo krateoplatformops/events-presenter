@@ -92,6 +92,7 @@ func main() {
 	probes.Register(mux, cfg.Log, pool, time.Second)
 
 	chain := use.NewChain(
+		use.Access(cfg.Log),
 		use.CORS(cors.Options{
 			AllowOriginFunc: func(r *http.Request, origin string) bool {
 				return true
