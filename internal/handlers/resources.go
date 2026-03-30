@@ -17,7 +17,7 @@ type ResourceEvent struct {
 	Namespace         string    `json:"namespace"`
 	ResourceKind      string    `json:"resource_kind"`
 	ResourceName      string    `json:"resource_name"`
-	InvolvedObjectUID string    `json:"involved_object_uid,omitempty"`
+	InvolvedObjectUID *string   `json:"involved_object_uid,omitempty"`
 	EventType         string    `json:"event_type"`
 	Reason            *string   `json:"reason,omitempty"`
 	Message           *string   `json:"message,omitempty"`
