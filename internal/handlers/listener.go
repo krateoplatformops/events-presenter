@@ -169,7 +169,8 @@ func loadLatestEvents(
             event_type,
             reason,
             message,
-            created_at
+            created_at,
+			composition_id
         FROM k8s_events
         WHERE global_uid = $1
         ORDER BY created_at DESC
@@ -195,6 +196,7 @@ func loadLatestEvents(
 			&ev.Reason,
 			&ev.Message,
 			&ev.CreatedAt,
+			&ev.CompositionID,
 		); err != nil {
 			metrics.IncListenerLoadLatestFailure(ctx)
 			return nil, err
