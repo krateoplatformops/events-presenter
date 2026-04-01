@@ -1,0 +1,11 @@
+{{- if .Values.endpoint.create }}
+apiVersion: v1
+kind: Secret
+type: Opaque
+metadata:
+  name: {{ include "events-presenter.fullname" . }}-endpoint
+  namespace: {{ .Release.Namespace }}
+stringData:
+  server-url: http://{{ include "events-presenter.fullname" . }}.{{ .Release.Namespace }}.svc:{{ .Values.service.port }}
+  insecure: "true"
+{{- end }}
