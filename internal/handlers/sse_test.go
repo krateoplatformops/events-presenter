@@ -70,6 +70,16 @@ func TestEventsSSEHandler_WithoutFilterStreamsAllEvents(t *testing.T) {
 	hub.Broadcast(ResourceEvent{GlobalUID: "1", CompositionID: &compA})
 	hub.Broadcast(ResourceEvent{GlobalUID: "2"})
 
+	// wait until both appear
+	deadline := time.Now().Add(1 * time.Second)
+	for time.Now().Before(deadline) {
+		body := rec.Body.String()
+		if strings.Contains(body, `"global_uid":"1"`) && strings.Contains(body, `"global_uid":"2"`) {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
 	cancel()
 	waitDone(t, done)
 
