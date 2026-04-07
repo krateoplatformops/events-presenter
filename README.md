@@ -26,9 +26,10 @@ The service acts as a bridge between PostgreSQL and connected clients:
 
 - Real-time event streaming via SSE
 - PostgreSQL LISTEN/NOTIFY integration
+- JWT-based authentication for protected endpoints
 - Connection pool for efficient DB usage
 - Internal worker queue for concurrent processing
-- Kubernetes-ready health probes
+- Kubernetes-ready health probes (no auth required)
 - Graceful shutdown handling
 - Structured logging support
 - Configurable via environment variables
@@ -36,16 +37,29 @@ The service acts as a bridge between PostgreSQL and connected clients:
 
 ## Endpoints
 
+## Authentication
+
+`/notifications` and `/events` require a JWT bearer token issued by the Krateo authn service.
+
+Pass it in the `Authorization` header:
+
+```
+Authorization: Bearer <token>
+```
+
+Requests without a valid token receive `401 Unauthorized`.
+
+Health probe endpoints (`/livez`, `/readyz`) are **exempt** from authentication.
+
 ### `GET /notifications`
 
-Server-Sent Events endpoint.
-
-Streams events to connected clients in real time.
+Server-Sent Events endpoint. Streams events to connected clients in real time.
 
 **Example:**
 
 ```bash
-curl -N http://localhost:8083/notifications
+curl -N http://localhost:8083/notifications \
+  --header "Authorization: Bearer <token>"
 ```
 
 ### `GET /events` and `POST /events`
@@ -53,11 +67,13 @@ curl -N http://localhost:8083/notifications
 Returns event-related resources from PostgreSQL.
 
 ```sh
-curl http://localhost:8083/events
+curl http://localhost:8083/events \
+  --header "Authorization: Bearer <token>"
 ```
 
 ```sh
 curl --request POST http://localhost:8083/events \
+  --header "Authorization: Bearer <token>" \
   --header "Content-Type: application/json" \
   --data '{"cluster":"cluster-a","limit":100}'
 ```
@@ -66,27 +82,31 @@ Detailed search and pagination examples are available in [`SEARCH.md`](./SEARCH.
 
 ## Health Checks
 
-| Endpoint  | Purpose                                                            |
-| --------- | ------------------------------------------------------------------ |
-| `/livez`  | Liveness probe – indicates the process is running                  |
-| `/readyz` | Readiness probe – indicates the service is ready to accept traffic |
+Health probes do **not** require authentication and are intended for Kubernetes internal use only.
+
+| Endpoint  | Auth required | Purpose                                                            |
+| --------- | ------------- | ------------------------------------------------------------------ |
+| `/livez`  | No            | Liveness probe – indicates the process is running                  |
+| `/readyz` | No            | Readiness probe – indicates the service is ready to accept traffic |
 
 
 ## Configuration
 
-| Variable           | Description                       | Default     |
-| ------------------ | --------------------------------- | ----------- |
-| `PORT`             | HTTP server port                  | `8083`      |
-| `DEBUG`            | Enable debug logging              | `false`     |
-| `DB_USER`          | Database username                 | —           |
-| `DB_PASS`          | Database password                 | —           |
-| `DB_NAME`          | Database name                     | —           |
-| `DB_HOST`          | Database host                     | `localhost` |
-| `DB_PORT`          | Database port                     | `5432`      |
-| `DB_PARAMS`        | Extra connection parameters       | —           |
-| `DB_READY_TIMEOUT` | Max time to wait for DB readiness | `2m`        |
-| `OTEL_ENABLED`     | Enable OpenTelemetry metrics      | `true`      |
-| `OTEL_EXPORT_INTERVAL` | Metrics export interval      | `30s`       |
+| Variable               | Description                                              | Default     |
+| ---------------------- | -------------------------------------------------------- | ----------- |
+| `PORT`                 | HTTP server port                                         | `8083`      |
+| `DEBUG`                | Enable debug logging                                     | `false`     |
+| `DB_USER`              | Database username                                        | —           |
+| `DB_PASS`              | Database password                                        | —           |
+| `DB_NAME`              | Database name                                            | —           |
+| `DB_HOST`              | Database host                                            | `localhost` |
+| `DB_PORT`              | Database port                                            | `5432`      |
+| `DB_PARAMS`            | Extra connection parameters                              | —           |
+| `DB_READY_TIMEOUT`     | Max time to wait for DB readiness                        | `2m`        |
+| `JWT_SIGN_KEY`         | HMAC signing key for JWT validation                      | —           |
+| `AUTHN_NS`             | Kubernetes namespace where user clientconfig secrets live | —           |
+| `OTEL_ENABLED`         | Enable OpenTelemetry metrics                             | `true`      |
+| `OTEL_EXPORT_INTERVAL` | Metrics export interval                                  | `30s`       |
 
 > The service builds a PostgreSQL connection string from these values.
 

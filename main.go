@@ -86,9 +86,8 @@ func main() {
 
 	// HTTP server
 	mux := http.NewServeMux()
-	mux.HandleFunc("/notifications", handlers.EventsSSEHandler(hub))
-	mux.HandleFunc("/events", handlers.ResourcesHandler(pool, metrics))
-	// Register common livez, readyz porbes
+
+	// Register /livez and /readyz without auth — Kubernetes probes must not require JWT.
 	probes.Register(mux, cfg.Log, pool, time.Second)
 
 	chain := use.NewChain(
@@ -111,9 +110,14 @@ func main() {
 		}),
 	)
 
+	authChain := chain.Append(use.UserConfig(cfg.SigningKey, cfg.AuthnNS))
+
+	mux.Handle("/notifications", authChain.Then(handlers.EventsSSEHandler(hub)))
+	mux.Handle("/events", authChain.Then(handlers.ResourcesHandler(pool, metrics)))
+
 	server := &http.Server{
 		Addr:         ":" + strconv.Itoa(cfg.Port),
-		Handler:      chain.Then(mux),
+		Handler:      mux,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 0, // SSE connections can stay open indefinitely.
 		IdleTimeout:  60 * time.Second,

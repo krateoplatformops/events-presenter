@@ -28,6 +28,11 @@ type Config struct {
 	OTelEnabled    bool
 	OTelInterval   time.Duration
 	Log            *slog.Logger
+
+	// SigningKey is the HMAC key used to validate JWT tokens.
+	SigningKey string
+	// AuthnNS is the Kubernetes namespace where user clientconfig secrets are stored.
+	AuthnNS string
 }
 
 func Setup() *Config {
@@ -87,6 +92,16 @@ func Setup() *Config {
 		"OpenTelemetry metric export interval",
 	)
 
+	cfgJWTSignKey := flag.String("jwt-sign-key",
+		env.String("JWT_SIGN_KEY", ""),
+		"Signing key for JWT validation",
+	)
+
+	cfgAuthnNS := flag.String("authn-ns",
+		env.String("AUTHN_NS", ""),
+		"Kubernetes namespace where user clientconfig secrets are stored",
+	)
+
 	flag.Usage = func() {
 		fmt.Fprintln(flag.CommandLine.Output(), "Flags:")
 		flag.PrintDefaults()
@@ -99,6 +114,8 @@ func Setup() *Config {
 	cfg.DbReadyTimeout = *cfgDbReadyTimeout
 	cfg.OTelEnabled = *cfgOTelEnabled
 	cfg.OTelInterval = *cfgOTelInterval
+	cfg.SigningKey = *cfgJWTSignKey
+	cfg.AuthnNS = *cfgAuthnNS
 
 	cfg.Log = logutil.New(serviceName, cfg.Debug)
 
