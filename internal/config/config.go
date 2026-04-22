@@ -7,8 +7,8 @@ import (
 	"os"
 	"time"
 
-	logutil "github.com/krateoplatformops/events-presenter/internal/util/log"
 	"github.com/krateoplatformops/plumbing/env"
+	"github.com/krateoplatformops/plumbing/logger"
 	"github.com/krateoplatformops/plumbing/pgutil"
 )
 
@@ -117,7 +117,7 @@ func Setup() *Config {
 	cfg.SigningKey = *cfgJWTSignKey
 	cfg.AuthnNS = *cfgAuthnNS
 
-	cfg.Log = logutil.New(serviceName, cfg.Debug)
+	cfg.Log = logger.New(serviceName, cfg.Debug)
 
 	params, err := parseDBParams(*cfgDbParams)
 	if err != nil {
