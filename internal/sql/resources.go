@@ -253,6 +253,7 @@ func shiftParamPlaceholders(query string, delta int) string {
 const resourcesBaseSQL = `
 WITH latest AS (
     SELECT DISTINCT ON (global_uid)
+        event_id,
         global_uid,
         cluster_name,
         namespace,

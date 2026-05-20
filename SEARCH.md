@@ -13,6 +13,10 @@ Supported methods:
 
 Internally, the query keeps only the newest row per `global_uid`, then applies filters, pagination, and ordering.
 
+When available, each returned item also includes `event_id`, the identifier of
+the underlying event row. The endpoint semantics do not change: `/events` still
+returns the latest row per resource, not a full event feed.
+
 ## Query Parameters
 
 All filters are optional and are combined with `AND`.
