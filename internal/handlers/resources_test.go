@@ -237,6 +237,9 @@ func TestResourcesHandler_CompositionIDPresentAndAbsent(t *testing.T) {
 		name, _ := obj["resource_name"].(string)
 		switch name {
 		case "res-with-comp":
+			if v, ok := obj["event_id"].(string); !ok || v == "" {
+				t.Fatalf("expected event_id for %q, got %#v", name, obj["event_id"])
+			}
 			v, ok := obj["composition_id"].(string)
 			if !ok {
 				t.Fatalf("expected composition_id for %q", name)
@@ -416,6 +419,7 @@ func applySchema(t *testing.T, db *pgxpool.Pool) {
 	_, err := db.Exec(context.Background(), `
 CREATE TABLE IF NOT EXISTS k8s_events (
 	created_at TIMESTAMPTZ NOT NULL,
+	event_id TEXT NULL,
 	cluster_name TEXT NOT NULL,
 	uid TEXT NOT NULL,
 	global_uid TEXT NOT NULL,
@@ -474,6 +478,7 @@ func insertEvent(
 	_, err := db.Exec(context.Background(), `
 INSERT INTO k8s_events (
 	created_at,
+	event_id,
 	cluster_name,
 	uid,
 	global_uid,
@@ -484,18 +489,19 @@ INSERT INTO k8s_events (
 	event_type,
 	raw,
 	resource_version
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Normal',$9,$10)
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Normal',$10,$11)
 `,
 		createdAt,
+		fmt.Sprintf("event-%s-%s", uid, rv),
 		cluster,
 		uid,
 		cluster+":"+uid,
 		ns,
 		kind,
-	name,
-	uid,
-	rawJSON,
-	rv,
+		name,
+		uid,
+		rawJSON,
+		rv,
 	)
 	if err != nil {
 		t.Fatal(err)
@@ -521,6 +527,7 @@ func insertEventWithCompositionID(
 	_, err := db.Exec(context.Background(), `
 INSERT INTO k8s_events (
 	created_at,
+	event_id,
 	cluster_name,
 	uid,
 	global_uid,
@@ -532,9 +539,10 @@ INSERT INTO k8s_events (
 	composition_id,
 	raw,
 	resource_version
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,'Normal',$9::uuid,$10,$11)
+) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'Normal',$10::uuid,$11,$12)
 `,
 		createdAt,
+		fmt.Sprintf("event-%s-%s", uid, rv),
 		cluster,
 		uid,
 		cluster+":"+uid,

@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -19,6 +21,11 @@ type PgListenerConfig struct {
 	Channel       string
 	ReconnectWait time.Duration
 	Log           *slog.Logger
+}
+
+type listenerNotification struct {
+	EventID   string
+	GlobalUID string
 }
 
 func RunPgListener(
@@ -98,11 +105,11 @@ func listenAndServe(
 			return err
 		}
 
-		globalUID := n.Payload
+		notification := parseListenerNotification(n.Payload)
 		metrics.IncListenerNotificationReceived(ctx)
 
-		q.Push(queue.NewJob(globalUID, func(v interface{}) {
-			uid := v.(string)
+		q.Push(queue.NewJob(notification, func(v interface{}) {
+			notification := v.(listenerNotification)
 			metrics.IncListenerJobEnqueued(ctx)
 
 			queryCtx, cancel := context.WithTimeout(ctx, 20*time.Second)
@@ -115,12 +122,18 @@ func listenAndServe(
 				BaseDelay:   500 * time.Millisecond,
 				MaxDelay:    10 * time.Second,
 			}, func() ([]ResourceEvent, error) {
-				return loadLatestEvents(queryCtx, db, uid, metrics)
+				if notification.EventID != "" {
+					return loadEventByID(queryCtx, db, notification.EventID, metrics)
+				}
+				return loadLatestEvents(queryCtx, db, notification.GlobalUID, metrics)
 			})
 			if err != nil {
-				log.Error("query error",
-					slog.String("global_uid", uid),
-					slog.Any("err", err))
+				attrs := []slog.Attr{
+					slog.String("global_uid", notification.GlobalUID),
+					slog.String("event_id", notification.EventID),
+					slog.Any("err", err),
+				}
+				log.LogAttrs(queryCtx, slog.LevelError, "query error", attrs...)
 				return
 			}
 
@@ -128,6 +141,32 @@ func listenAndServe(
 				hub.Broadcast(ev)
 			}
 		}))
+	}
+}
+
+func parseListenerNotification(payload string) listenerNotification {
+	payload = strings.TrimSpace(payload)
+	if payload == "" {
+		return listenerNotification{}
+	}
+
+	var raw struct {
+		EventID   string `json:"event_id"`
+		GlobalUID string `json:"global_uid"`
+	}
+	if err := json.Unmarshal([]byte(payload), &raw); err != nil {
+		return listenerNotification{GlobalUID: payload}
+	}
+
+	raw.EventID = strings.TrimSpace(raw.EventID)
+	raw.GlobalUID = strings.TrimSpace(raw.GlobalUID)
+	if raw.EventID == "" {
+		return listenerNotification{GlobalUID: raw.GlobalUID}
+	}
+
+	return listenerNotification{
+		EventID:   raw.EventID,
+		GlobalUID: raw.GlobalUID,
 	}
 }
 
@@ -145,6 +184,73 @@ func sleepWithBackoff(ctx context.Context, d time.Duration) time.Duration {
 		next = 30 * time.Second
 	}
 	return next
+}
+
+func loadEventByID(
+	ctx context.Context,
+	db *pgxpool.Pool,
+	eventID string,
+	metrics *telemetry.Metrics,
+) ([]ResourceEvent, error) {
+	started := time.Now()
+	defer func() {
+		metrics.RecordListenerLoadLatestDuration(ctx, time.Since(started))
+	}()
+
+	rows, err := db.Query(ctx, `
+        SELECT
+			event_id,
+            global_uid,
+			cluster_name,
+			namespace,
+			resource_kind,
+			resource_name,
+			involved_object_uid,
+            event_type,
+            reason,
+            message,
+            created_at,
+			composition_id
+        FROM k8s_events
+        WHERE event_id = $1
+        LIMIT 1
+    `, eventID)
+	if err != nil {
+		metrics.IncListenerLoadLatestFailure(ctx)
+		return nil, err
+	}
+	defer rows.Close()
+
+	var res []ResourceEvent
+	for rows.Next() {
+		var ev ResourceEvent
+		var scannedEventID string
+		if err := rows.Scan(
+			&scannedEventID,
+			&ev.GlobalUID,
+			&ev.ClusterName,
+			&ev.Namespace,
+			&ev.ResourceKind,
+			&ev.ResourceName,
+			&ev.InvolvedObjectUID,
+			&ev.EventType,
+			&ev.Reason,
+			&ev.Message,
+			&ev.CreatedAt,
+			&ev.CompositionID,
+		); err != nil {
+			metrics.IncListenerLoadLatestFailure(ctx)
+			return nil, err
+		}
+		ev.EventID = &scannedEventID
+		res = append(res, ev)
+	}
+	if rows.Err() != nil {
+		metrics.IncListenerLoadLatestFailure(ctx)
+		return nil, rows.Err()
+	}
+
+	return res, nil
 }
 
 func loadLatestEvents(

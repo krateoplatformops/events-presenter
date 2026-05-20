@@ -12,6 +12,7 @@ import (
 )
 
 type ResourceEvent struct {
+	EventID           *string   `json:"event_id,omitempty"`
 	GlobalUID         string    `json:"global_uid"`
 	ClusterName       string    `json:"cluster_name"`
 	Namespace         string    `json:"namespace"`
@@ -88,6 +89,7 @@ func ResourcesHandler(db *pgxpool.Pool, metrics *telemetry.Metrics) http.Handler
 			var e ResourceEvent
 			var rawJSON []byte
 			if err := rows.Scan(
+				&e.EventID,
 				&e.GlobalUID,
 				&e.ClusterName,
 				&e.Namespace,
