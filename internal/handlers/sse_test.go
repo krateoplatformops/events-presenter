@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -11,7 +12,7 @@ import (
 
 func TestEventsSSEHandler_FiltersByCompositionID(t *testing.T) {
 	hub := NewEventHub(nil)
-	handler := EventsSSEHandler(hub)
+	handler := EventsSSEHandler(hub, slog.Default())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -50,7 +51,7 @@ func TestEventsSSEHandler_FiltersByCompositionID(t *testing.T) {
 
 func TestEventsSSEHandler_WithoutFilterStreamsAllEvents(t *testing.T) {
 	hub := NewEventHub(nil)
-	handler := EventsSSEHandler(hub)
+	handler := EventsSSEHandler(hub, slog.Default())
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
