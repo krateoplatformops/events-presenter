@@ -89,7 +89,6 @@ func ResourcesHandler(db *pgxpool.Pool, metrics *telemetry.Metrics) http.Handler
 			var e ResourceEvent
 			var rawJSON []byte
 			if err := rows.Scan(
-				&e.EventID,
 				&e.GlobalUID,
 				&e.ClusterName,
 				&e.Namespace,
