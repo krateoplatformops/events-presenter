@@ -112,7 +112,7 @@ func main() {
 
 	authChain := chain.Append(use.UserConfig(cfg.SigningKey, cfg.AuthnNS))
 
-	mux.Handle("/notifications", authChain.Then(handlers.EventsSSEHandler(hub)))
+	mux.Handle("/notifications", authChain.Then(handlers.EventsSSEHandler(hub, cfg.Log)))
 	mux.Handle("/events", authChain.Then(handlers.ResourcesHandler(pool, metrics)))
 
 	server := &http.Server{

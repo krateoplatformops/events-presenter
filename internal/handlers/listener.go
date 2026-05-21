@@ -106,9 +106,18 @@ func listenAndServe(
 		}
 
 		notification := parseListenerNotification(n.Payload)
+		log.Debug("notification received",
+			slog.String("global_uid", notification.GlobalUID),
+			slog.String("event_id", notification.EventID),
+		)
+
 		metrics.IncListenerNotificationReceived(ctx)
 
-		q.Push(queue.NewJob(notification, func(v interface{}) {
+		log.Debug("pushing fetch notification job to queue",
+			slog.String("global_uid", notification.GlobalUID),
+			slog.String("event_id", notification.EventID),
+		)
+		q.Push(queue.NewJob(notification, func(v any) {
 			notification := v.(listenerNotification)
 			metrics.IncListenerJobEnqueued(ctx)
 
@@ -123,7 +132,7 @@ func listenAndServe(
 				MaxDelay:    10 * time.Second,
 			}, func() ([]ResourceEvent, error) {
 				if notification.EventID != "" {
-					return loadEventByID(queryCtx, db, notification.EventID, metrics)
+					return loadEventByID(queryCtx, db, notification.EventID, log, metrics)
 				}
 				return loadLatestEvents(queryCtx, db, notification.GlobalUID, metrics)
 			})
@@ -190,6 +199,7 @@ func loadEventByID(
 	ctx context.Context,
 	db *pgxpool.Pool,
 	eventID string,
+	log *slog.Logger,
 	metrics *telemetry.Metrics,
 ) ([]ResourceEvent, error) {
 	started := time.Now()
@@ -197,7 +207,7 @@ func loadEventByID(
 		metrics.RecordListenerLoadLatestDuration(ctx, time.Since(started))
 	}()
 
-	rows, err := db.Query(ctx, `
+	query := `
         SELECT
 			event_id,
             global_uid,
@@ -214,12 +224,17 @@ func loadEventByID(
         FROM k8s_events
         WHERE event_id = $1
         LIMIT 1
-    `, eventID)
+    `
+	rows, err := db.Query(ctx, query, eventID)
 	if err != nil {
 		metrics.IncListenerLoadLatestFailure(ctx)
 		return nil, err
 	}
 	defer rows.Close()
+
+	log.Debug("loaded events on pg notify",
+		slog.String("event_id", eventID),
+	)
 
 	var res []ResourceEvent
 	for rows.Next() {
@@ -244,11 +259,20 @@ func loadEventByID(
 		}
 		ev.EventID = &scannedEventID
 		res = append(res, ev)
+
+		log.Debug("event details", slog.Any("ev", ev))
 	}
 	if rows.Err() != nil {
 		metrics.IncListenerLoadLatestFailure(ctx)
 		return nil, rows.Err()
 	}
+
+	log.Debug("query completed",
+		slog.String("query", query),
+		slog.String("event_id", eventID),
+		slog.Int("rows", len(res)),
+		slog.Duration("duration", time.Since(started)),
+	)
 
 	return res, nil
 }

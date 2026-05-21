@@ -3,11 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 )
 
-func EventsSSEHandler(hub *EventHub) http.HandlerFunc {
+func EventsSSEHandler(hub *EventHub, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		compositionID := strings.TrimSpace(r.URL.Query().Get("composition_id"))
 
@@ -29,8 +30,13 @@ func EventsSSEHandler(hub *EventHub) http.HandlerFunc {
 		for {
 			select {
 			case ev := <-ch:
+				log.Debug("event received from hub", slog.Any("ev", ev))
 				if compositionID != "" {
 					if ev.CompositionID == nil || *ev.CompositionID != compositionID {
+						log.Debug("event skipped because it does not belong to requested composition",
+							slog.String("requested_composition_id", compositionID),
+							slog.Any("event_composition_id", ev.CompositionID),
+						)
 						continue
 					}
 				}
@@ -39,6 +45,8 @@ func EventsSSEHandler(hub *EventHub) http.HandlerFunc {
 				fmt.Fprintf(w, "event: krateo\n")
 				fmt.Fprintf(w, "data: %s\n\n", data)
 				flusher.Flush()
+
+				log.Debug("event sent to client", slog.Any("ev", ev))
 
 			case <-ctx.Done():
 				return
