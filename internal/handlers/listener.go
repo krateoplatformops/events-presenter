@@ -42,7 +42,12 @@ func RunPgListener(
 
 		cfg.Log.Debug("pg listener: connecting...")
 
-		conn, err := pgx.Connect(ctx, cfg.DSN)
+		// pgxpool.ParseConfig strips the pool_* keys, which pgx.Connect would send to Postgres as session settings.
+		var conn *pgx.Conn
+		poolCfg, err := pgxpool.ParseConfig(cfg.DSN)
+		if err == nil {
+			conn, err = pgx.ConnectConfig(ctx, poolCfg.ConnConfig)
+		}
 		if err != nil {
 			metrics.IncListenerConnectFailure(ctx)
 			backoff = sleepWithBackoff(ctx, backoff)
